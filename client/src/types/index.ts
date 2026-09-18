@@ -31,8 +31,58 @@ export interface Board {
   width: number;
   height: number;
   backgroundColor: string;
+  templateId?: string;
+  templateReplacements?: ReplacementSnapshot | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type ReplacementStatus = 'replaced' | 'empty' | 'placeholder' | 'too-long';
+
+export interface ReplaceableFieldMeta {
+  key: string;
+  label: string;
+  layerName: string;
+  elementId: string;
+  maxLength: number;
+  prefix: string;
+  originalText: string;
+}
+
+export interface ReplaceableGroupMeta {
+  key: string;
+  label: string;
+  layerName: string;
+  fields: ReplaceableFieldMeta[];
+}
+
+export interface ReplacementFieldResult extends ReplaceableFieldMeta {
+  location: string;
+  status: ReplacementStatus;
+  applied: boolean;
+  inputValue: string;
+  length: number;
+  finalText: string;
+  message: string;
+}
+
+export interface ReplacementPreviewGroup {
+  key: string;
+  label: string;
+  layerName: string;
+  fields: ReplacementFieldResult[];
+}
+
+export interface ReplacementPreview {
+  templateId: string;
+  templateName: string;
+  groups: ReplacementPreviewGroup[];
+  appliedCount: number;
+  skippedCount: number;
+}
+
+export interface ReplacementSnapshot extends ReplacementPreview {
+  appliedAt: string;
 }
 
 export type ViewType = 'dashboard' | 'board';
@@ -63,4 +113,6 @@ export interface Template {
   height: number;
   backgroundColor: string;
   layers?: Layer[];
+  replaceable?: boolean;
+  fieldGroups?: ReplaceableGroupMeta[] | null;
 }

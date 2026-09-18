@@ -15,7 +15,10 @@ const boardSchema = new mongoose.Schema({
   layers: [layerSchema],
   width: { type: Number, default: 3000 },
   height: { type: Number, default: 2000 },
-  backgroundColor: { type: String, default: '#ffffff' }
+  backgroundColor: { type: String, default: '#ffffff' },
+  // 来源模板及本次创建的字段替换结果（仅模板创建且发生替换时有值）
+  templateId: { type: String },
+  templateReplacements: { type: mongoose.Schema.Types.Mixed }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Board', boardSchema);

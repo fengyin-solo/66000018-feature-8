@@ -153,11 +153,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBoardSelect }) => {
     }
   };
 
-  const handleCreateBoard = async (name: string, templateId?: string) => {
+  const handleCreateBoard = async (
+    name: string,
+    templateId?: string,
+    replacements?: Record<string, string>
+  ) => {
     try {
       let newBoard: Board | null = null;
       if (templateId) {
-        newBoard = await templateApi.createBoardFromTemplate(templateId, { name, ownerId: userId });
+        newBoard = await templateApi.createBoardFromTemplate(templateId, {
+          name,
+          ownerId: userId,
+          replacements,
+        });
       } else {
         newBoard = await boardApi.createBoard({ name, ownerId: userId });
       }
