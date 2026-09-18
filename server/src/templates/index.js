@@ -590,6 +590,51 @@ const meetingMinutesTemplate = {
       ],
     },
   ],
+  replaceable: {
+    groups: [
+      {
+        key: 'agenda',
+        label: '议程',
+        itemLabel: '议程',
+        pattern: '{n}. {value}',
+        token: 'value',
+        maxLength: 12,
+        checkDuplicate: true,
+        inputPlaceholder: '如：需求评审',
+        emptyHint: '留空则保留模板默认议程',
+        slots: [
+          { elementId: 'el-agenda-1' },
+          { elementId: 'el-agenda-2' },
+          { elementId: 'el-agenda-3' },
+          { elementId: 'el-agenda-4' },
+          { elementId: 'el-agenda-5' },
+        ],
+      },
+      {
+        key: 'attendees',
+        label: '参会人员',
+        itemLabel: '参会人',
+        pattern: '□ {value}',
+        token: 'value',
+        maxLength: 20,
+        checkDuplicate: true,
+        inputPlaceholder: '如：张三（产品）',
+        emptyHint: '留空则保留模板中的空白填写位',
+        slots: [
+          { elementId: 'el-attend-1' },
+          { elementId: 'el-attend-2' },
+          { elementId: 'el-attend-3' },
+          { elementId: 'el-attend-4' },
+          { elementId: 'el-attend-5' },
+          { elementId: 'el-attend-6' },
+          { elementId: 'el-attend-7' },
+          { elementId: 'el-attend-8' },
+          { elementId: 'el-attend-9' },
+          { elementId: 'el-attend-10' },
+        ],
+      },
+    ],
+  },
 };
 
 const workflowTemplate = {
@@ -1348,6 +1393,44 @@ const workflowTemplate = {
       ],
     },
   ],
+  replaceable: {
+    groups: [
+      {
+        key: 'steps',
+        label: '步骤图例',
+        itemLabel: '步骤',
+        pattern: '步骤{n}\n{value}',
+        token: 'value',
+        maxLength: 10,
+        checkDuplicate: true,
+        inputPlaceholder: '如：需求收集',
+        emptyHint: '留空则保留模板默认步骤名称',
+        slots: [
+          { elementId: 'el-step-1-text' },
+          { elementId: 'el-step-2-text' },
+          { elementId: 'el-step-3-yes-text' },
+          { elementId: 'el-step-4-text' },
+          { elementId: 'el-step-5-text' },
+        ],
+      },
+      {
+        key: 'legend',
+        label: '流程图例',
+        itemLabel: '图例',
+        pattern: '{value}',
+        token: 'value',
+        maxLength: 10,
+        checkDuplicate: true,
+        inputPlaceholder: '如：开始/结束',
+        emptyHint: '留空则保留模板默认图例名称',
+        slots: [
+          { elementId: 'el-legend-start-text' },
+          { elementId: 'el-legend-process-text' },
+          { elementId: 'el-legend-decision-text' },
+        ],
+      },
+    ],
+  },
 };
 
 const weeklyPlanTemplate = {

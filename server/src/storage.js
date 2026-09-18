@@ -45,6 +45,7 @@ class LocalBoard {
     this.width = data.width || 3000;
     this.height = data.height || 2000;
     this.backgroundColor = data.backgroundColor || '#ffffff';
+    this.templateSource = data.templateSource || null;
     this.createdAt = data.createdAt || new Date().toISOString();
     this.updatedAt = data.updatedAt || new Date().toISOString();
   }
@@ -59,6 +60,7 @@ class LocalBoard {
       width: this.width,
       height: this.height,
       backgroundColor: this.backgroundColor,
+      templateSource: this.templateSource,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };

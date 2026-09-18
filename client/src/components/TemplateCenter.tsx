@@ -1,12 +1,369 @@
-import React, { useState, useEffect } from 'react';
-import { Template } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Template,
+  TemplatePreview,
+  ReplaceableGroupConfig,
+  ReplacementSlotPreview,
+} from '../types';
 import { templateApi } from '../services/api';
 
 interface TemplateCenterProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, templateId?: string) => void;
+  onCreate: (
+    name: string,
+    templateId?: string,
+    replacements?: Record<string, string[]>
+  ) => void;
 }
+
+const issueColor: Record<string, string> = {
+  empty: '#6b7280',
+  'too-long': '#dc2626',
+  duplicate: '#d97706',
+  config: '#dc2626',
+};
+
+const buildEmptyReplacements = (
+  template: Template | undefined
+): Record<string, string[]> => {
+  const result: Record<string, string[]> = {};
+  template?.replaceable?.groups.forEach((group) => {
+    result[group.key] = group.slots.map(() => '');
+  });
+  return result;
+};
+
+/** 关键字段替换表单 + 创建前替换结果预览 */
+const ReplacementPanel: React.FC<{
+  template: Template;
+  values: Record<string, string[]>;
+  preview: TemplatePreview | null;
+  loading: boolean;
+  previewError: string | null;
+  onChange: (groupKey: string, slotIndex: number, value: string) => void;
+}> = ({ template, values, preview, loading, previewError, onChange }) => {
+  const groups = template.replaceable?.groups || [];
+
+  const previewMap = useMemo(() => {
+    const map = new Map<string, ReplacementSlotPreview>();
+    preview?.groups.forEach((group) => {
+      group.slots.forEach((slot) => map.set(`${group.key}:${slot.slotIndex}`, slot));
+    });
+    return map;
+  }, [preview]);
+
+  const replacedCount =
+    preview?.groups.reduce(
+      (sum, group) => sum + group.slots.filter((slot) => slot.replaced).length,
+      0
+    ) ?? 0;
+  const totalCount =
+    preview?.groups.reduce((sum, group) => sum + group.slots.length, 0) ?? 0;
+
+  const renderGroupFields = (group: ReplaceableGroupConfig) => (
+    <div
+      key={group.key}
+      style={{
+        background: '#f9fafb',
+        border: '1px solid #e5e7eb',
+        borderRadius: '10px',
+        padding: '16px',
+      }}
+    >
+      <div style={{ marginBottom: '12px' }}>
+        <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#1a1a1a' }}>
+          {group.label}
+        </h4>
+        {group.emptyHint && (
+          <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#9ca3af' }}>
+            {group.emptyHint}
+          </p>
+        )}
+      </div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+          gap: '12px',
+        }}
+      >
+        {group.slots.map((slotConfig, slotIndex) => {
+          const maxLength = slotConfig.maxLength || group.maxLength;
+          const value = values[group.key]?.[slotIndex] || '';
+          const slotPreview = previewMap.get(`${group.key}:${slotIndex}`);
+          const issue = slotPreview?.issues[0];
+          const replaced = !!slotPreview?.replaced;
+          const length = Array.from(value.trim()).length;
+          const overLimit = maxLength ? length > maxLength : false;
+          const statusColor = replaced
+            ? '#059669'
+            : issue
+            ? issueColor[issue.type] || '#6b7280'
+            : '#9ca3af';
+
+          return (
+            <div key={`${group.key}-${slotIndex}`}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  marginBottom: '4px',
+                }}
+              >
+                <span>{group.itemLabel} {slotIndex + 1}</span>
+                <span style={{ color: overLimit ? '#dc2626' : '#9ca3af' }}>
+                  {length}/{maxLength}
+                </span>
+              </label>
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => onChange(group.key, slotIndex, e.target.value)}
+                placeholder={group.inputPlaceholder || slotPreview?.originalValue || ''}
+                maxLength={maxLength + 20}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  fontSize: '13px',
+                  border: `1px solid ${overLimit ? '#fca5a5' : '#d1d5db'}`,
+                  borderRadius: '6px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={(e) => {
+                  if (!overLimit) e.target.style.borderColor = '#667eea';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = overLimit ? '#fca5a5' : '#d1d5db';
+                }}
+              />
+              <p
+                style={{
+                  margin: '4px 0 0',
+                  fontSize: '11px',
+                  lineHeight: 1.4,
+                  color: statusColor,
+                  minHeight: '15px',
+                }}
+                title={issue?.message || ''}
+              >
+                {replaced
+                  ? '✓ 将替换为该内容'
+                  : issue
+                  ? issue.message
+                  : value.trim() === ''
+                  ? '未填写，保留模板原内容'
+                  : ''}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div
+      style={{
+        marginTop: '20px',
+        border: '1px solid #e5e7eb',
+        borderRadius: '12px',
+        padding: '16px',
+        background: '#ffffff',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '12px',
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+            fontSize: '15px',
+            fontWeight: 600,
+            color: '#374151',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span>✏️</span> 按实际内容替换关键字段
+        </h3>
+        {preview && (
+          <span style={{ fontSize: '12px', color: '#6b7280' }}>
+            <span style={{ color: '#059669', fontWeight: 600 }}>{replacedCount} 项替换</span>
+            {' / '}
+            <span style={{ color: '#6b7280', fontWeight: 600 }}>{totalCount - replacedCount} 项保留原模板</span>
+          </span>
+        )}
+        {loading && <span style={{ fontSize: '12px', color: '#667eea' }}>预览计算中…</span>}
+      </div>
+
+      <p style={{ margin: '0 0 14px', fontSize: '12px', color: '#9ca3af' }}>
+        字段为空、与同组其它字段重复、或内容超过长度上限时，将保留模板原内容，具体位置见下方替换结果。
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {groups.map(renderGroupFields)}
+      </div>
+
+      {previewError && (
+        <div
+          style={{
+            marginTop: '12px',
+            padding: '8px 12px',
+            background: '#fffbeb',
+            border: '1px solid #fde68a',
+            borderRadius: '8px',
+            color: '#b45309',
+            fontSize: '12px',
+          }}
+        >
+          {previewError}
+        </div>
+      )}
+
+      {preview && (
+        <div style={{ marginTop: '16px' }}>
+          <h4
+            style={{
+              margin: '0 0 8px',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: '#374151',
+            }}
+          >
+            创建后画板内容预览
+          </h4>
+          {preview.groups.map((group) => (
+            <div key={group.key} style={{ marginBottom: '12px' }}>
+              <div
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#6b7280',
+                  marginBottom: '6px',
+                }}
+              >
+                {group.label}
+              </div>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '12px',
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th
+                      style={{
+                        textAlign: 'left',
+                        padding: '6px 8px',
+                        background: '#f3f4f6',
+                        color: '#6b7280',
+                        fontWeight: 500,
+                        width: '110px',
+                        border: '1px solid #e5e7eb',
+                      }}
+                    >
+                      位置
+                    </th>
+                    <th
+                      style={{
+                        textAlign: 'left',
+                        padding: '6px 8px',
+                        background: '#f3f4f6',
+                        color: '#6b7280',
+                        fontWeight: 500,
+                        border: '1px solid #e5e7eb',
+                      }}
+                    >
+                      模板原内容
+                    </th>
+                    <th
+                      style={{
+                        textAlign: 'left',
+                        padding: '6px 8px',
+                        background: '#f3f4f6',
+                        color: '#6b7280',
+                        fontWeight: 500,
+                        border: '1px solid #e5e7eb',
+                      }}
+                    >
+                      创建后内容
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.slots.map((slot) => (
+                    <tr key={`${group.key}-${slot.slotIndex}`}>
+                      <td
+                        style={{
+                          padding: '6px 8px',
+                          color: '#374151',
+                          whiteSpace: 'nowrap',
+                          border: '1px solid #e5e7eb',
+                        }}
+                      >
+                        {slot.position}
+                        <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                          {slot.layerName}
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          padding: '6px 8px',
+                          color: '#6b7280',
+                          border: '1px solid #e5e7eb',
+                        }}
+                      >
+                        <span style={{ whiteSpace: 'pre-wrap' }}>
+                          {slot.originalValue || slot.originalText}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          padding: '6px 8px',
+                          border: '1px solid #e5e7eb',
+                          color: slot.replaced ? '#059669' : '#374151',
+                          fontWeight: slot.replaced ? 600 : 400,
+                        }}
+                      >
+                        <span style={{ whiteSpace: 'pre-wrap' }}>{slot.finalText}</span>
+                        {!slot.replaced && slot.issues[0] && (
+                          <span
+                            style={{
+                              display: 'block',
+                              marginTop: '2px',
+                              fontSize: '11px',
+                              color: issueColor[slot.issues[0].type] || '#6b7280',
+                              fontWeight: 400,
+                            }}
+                          >
+                            保留原内容：{slot.issues[0].message}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose, onCreate }) => {
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -15,6 +372,10 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [replacements, setReplacements] = useState<Record<string, string[]>>({});
+  const [preview, setPreview] = useState<TemplatePreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -22,8 +383,72 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
       setSelectedTemplate(null);
       setName('');
       setError(null);
+      setReplacements({});
+      setPreview(null);
+      setPreviewError(null);
     }
   }, [isOpen]);
+
+  const selectedTpl = templates.find((t) => t._id === selectedTemplate);
+
+  // 防抖实时预览：判定规则以后端为准，创建前先展示替换结果
+  useEffect(() => {
+    if (!selectedTpl?.replaceable) {
+      setPreview(null);
+      setPreviewError(null);
+      setPreviewLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPreviewLoading(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const data = await templateApi.previewReplacements(selectedTpl!._id, replacements);
+        if (!cancelled) {
+          setPreview(data);
+          setPreviewError(null);
+        }
+      } catch (previewErr) {
+        console.error('Failed to preview replacements:', previewErr);
+        if (!cancelled) {
+          setPreviewError('替换预览暂不可用，创建时仍会按相同规则校验');
+        }
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTemplate, replacements, templates]);
+
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    const template = templates.find((t) => t._id === templateId);
+    setReplacements(buildEmptyReplacements(template));
+    setPreview(null);
+    setPreviewError(null);
+  };
+
+  const handleSelectBlank = () => {
+    setSelectedTemplate(null);
+    setReplacements({});
+    setPreview(null);
+    setPreviewError(null);
+  };
+
+  const handleReplacementChange = (groupKey: string, slotIndex: number, value: string) => {
+    setReplacements((prev) => {
+      const groupValues = [...(prev[groupKey] || [])];
+      groupValues[slotIndex] = value;
+      return { ...prev, [groupKey]: groupValues };
+    });
+  };
 
   const loadTemplates = async () => {
     try {
@@ -41,47 +466,42 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (creating) return;
-
-    const boardName = name.trim() || (selectedTemplate
+  const getBoardName = () =>
+    name.trim() ||
+    (selectedTemplate
       ? templates.find((t) => t._id === selectedTemplate)?.name || '未命名白板'
       : '未命名白板');
 
+  const finishCreate = async (create: () => Promise<void> | void) => {
+    if (creating) return;
     try {
       setCreating(true);
       setError(null);
-      await onCreate(boardName, selectedTemplate || undefined);
+      await create();
       setName('');
       setSelectedTemplate(null);
+      setReplacements({});
+      setPreview(null);
       onClose();
-    } catch (error) {
-      console.error('Failed to create board:', error);
+    } catch (err) {
+      console.error('Failed to create board:', err);
       setError('创建白板失败，请重试');
     } finally {
       setCreating(false);
     }
   };
 
-  const handleCreateBlank = async () => {
-    if (creating) return;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTemplate) return;
+    const templateReplacements = selectedTpl?.replaceable ? replacements : undefined;
+    finishCreate(() =>
+      onCreate(getBoardName(), selectedTemplate, templateReplacements)
+    );
+  };
 
-    const boardName = name.trim() || '未命名白板';
-
-    try {
-      setCreating(true);
-      setError(null);
-      await onCreate(boardName, undefined);
-      setName('');
-      setSelectedTemplate(null);
-      onClose();
-    } catch (error) {
-      console.error('Failed to create board:', error);
-      setError('创建白板失败，请重试');
-    } finally {
-      setCreating(false);
-    }
+  const handleCreateBlank = () => {
+    finishCreate(() => onCreate(name.trim() || '未命名白板', undefined));
   };
 
   const TemplateCard: React.FC<{
@@ -182,6 +602,21 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
         >
           {template.description}
         </p>
+        {template.replaceable && (
+          <span
+            style={{
+              display: 'inline-block',
+              marginTop: '8px',
+              fontSize: '11px',
+              color: '#667eea',
+              background: '#eef2ff',
+              borderRadius: '10px',
+              padding: '2px 8px',
+            }}
+          >
+            支持替换关键字段
+          </span>
+        )}
       </div>
     </div>
   );
@@ -340,7 +775,7 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
                 <span>📄</span> 空白白板
               </h3>
               <div
-                onClick={() => setSelectedTemplate(null)}
+                onClick={handleSelectBlank}
                 style={{
                   width: '220px',
                   borderRadius: '12px',
@@ -487,12 +922,23 @@ export const TemplateCenter: React.FC<TemplateCenterProps> = ({ isOpen, onClose,
                       key={template._id}
                       template={template}
                       selected={selectedTemplate === template._id}
-                      onClick={() => setSelectedTemplate(template._id)}
+                      onClick={() => handleSelectTemplate(template._id)}
                     />
                   ))}
                 </div>
               )}
             </div>
+
+            {selectedTpl?.replaceable && (
+              <ReplacementPanel
+                template={selectedTpl}
+                values={replacements}
+                preview={preview}
+                loading={previewLoading}
+                previewError={previewError}
+                onChange={handleReplacementChange}
+              />
+            )}
           </div>
 
           <div

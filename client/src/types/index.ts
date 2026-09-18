@@ -22,6 +22,89 @@ export interface Layer {
   elements: BoardElement[];
 }
 
+export interface ReplaceableSlotConfig {
+  elementId: string;
+  maxLength?: number;
+  pattern?: string;
+}
+
+export interface ReplaceableGroupConfig {
+  key: string;
+  label: string;
+  itemLabel: string;
+  pattern: string;
+  token: string;
+  maxLength: number;
+  checkDuplicate?: boolean;
+  inputPlaceholder?: string;
+  emptyHint?: string;
+  slots: ReplaceableSlotConfig[];
+}
+
+export interface ReplaceableConfig {
+  groups: ReplaceableGroupConfig[];
+}
+
+export type ReplacementIssueType = 'empty' | 'too-long' | 'duplicate' | 'config';
+
+export interface ReplacementIssue {
+  type: ReplacementIssueType;
+  message: string;
+  maxLength?: number;
+  length?: number;
+  duplicateWith?: string[];
+}
+
+export interface ReplacementSlotPreview {
+  groupKey: string;
+  slotIndex: number;
+  position: string;
+  location: string;
+  elementId: string;
+  layerName: string;
+  originalValue: string;
+  originalText: string;
+  inputValue: string;
+  value: string;
+  finalText: string;
+  replaced: boolean;
+  issues: ReplacementIssue[];
+}
+
+export interface ReplacementGroupPreview {
+  key: string;
+  label: string;
+  itemLabel: string;
+  slots: ReplacementSlotPreview[];
+}
+
+export interface TemplatePreview {
+  templateId: string;
+  groups: ReplacementGroupPreview[];
+}
+
+export interface TemplateSourceSlot {
+  position: string;
+  location: string;
+  elementId: string;
+  layerName: string;
+  originalValue: string;
+  originalText: string;
+  value: string;
+  finalText: string;
+  replaced: boolean;
+  issues: ReplacementIssue[];
+}
+
+export interface TemplateSource {
+  templateId: string;
+  templateName: string;
+  appliedAt: string;
+  replacedCount: number;
+  retainedCount: number;
+  groups: Array<{ key: string; label: string; slots: TemplateSourceSlot[] }>;
+}
+
 export interface Board {
   _id: string;
   name: string;
@@ -31,6 +114,7 @@ export interface Board {
   width: number;
   height: number;
   backgroundColor: string;
+  templateSource?: TemplateSource | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,4 +147,5 @@ export interface Template {
   height: number;
   backgroundColor: string;
   layers?: Layer[];
+  replaceable?: ReplaceableConfig | null;
 }
